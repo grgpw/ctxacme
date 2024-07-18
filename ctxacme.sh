@@ -5,6 +5,7 @@ KEYFILE=$2
 CHAINFILE=$3
 alias=$4
 CITRIXADCIP=$5
+CHAINNAME=acme-chain-$(openssl x509 -in $CHAINFILE -noout -subject_hash)
 
 getAuthCookie () {
 params="-s -i -k -H Content-Type:application/json -X POST -d {\"login\":{\"username\":\"$CITRIXADCUSER\",\"password\":\"$CITRIXADCPW\"}} https://${CITRIXADCIP}/nitro/v1/config/login"
@@ -111,15 +112,16 @@ else
 	sendFile "acme-$alias.key" "$KEYFILE"
 	sendFile "acme-$alias.pem" "$CERTFILE"
 	createSSL "acme-$alias" "acme-$alias.pem" "acme-$alias.key"
-	getSSL "acme-chain"
-	if [ "$content" = 200 ]; then
-		echo "using existing CA"
-	elif [ "$content" = 599 ]; then
-		sendFile "acme-chain.pem" "$CHAINFILE"
-		createSSLCA "acme-chain" "acme-chain.pem"
-	fi
-	linkSSL "acme-$alias" "acme-chain"
 fi
+
+getSSL "$CHAINNAME"
+if [ "$content" = 200 ]; then
+	echo "using existing CA and chain"
+elif [ "$content" = 599 ]; then
+	sendFile "$CHAINNAME.pem" "$CHAINFILE"
+	createSSLCA "$CHAINNAME" "$CHAINNAME.pem"
+fi
+linkSSL "acme-$alias" "$CHAINNAME"
 
 savensconfig
 adclogout
